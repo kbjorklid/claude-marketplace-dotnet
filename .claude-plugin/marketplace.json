@@ -1,0 +1,17 @@
+{
+  "name": "claude-dotnet-marketpalace",
+  "owner": {
+    "name": "Kalle Björklid",
+    "email": "kalle.bjorklid@gmail.com"
+  },
+  "description": "A marketplace for Claude Code plugins focused on .NET development.",
+  "plugins": [
+    {
+      "name": "stryker-dotnet",
+      "source": "./plugins/stryker-dotnet",
+      "description": "Plugin for improving Stryker.NET usage in claude code.",
+      "version": "0.1.0"
+    }
+  ]
+}
+

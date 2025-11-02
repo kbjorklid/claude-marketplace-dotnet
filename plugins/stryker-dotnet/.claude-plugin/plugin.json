@@ -1,0 +1,10 @@
+{
+  "name": "stryker-dotnet",
+  "version": "0.1.0",
+  "description": "Plugin for improving Stryker.NET usage in claude code.",
+  "author": {
+    "name": "Kalle Björklid",
+    "email": "kalle.bjorklid@gmail.com"
+  },
+  "keywords": ["mutation testing", "testing", "stryker", "dotnet"]
+}
