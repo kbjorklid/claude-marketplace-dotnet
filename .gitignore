@@ -1,0 +1,2 @@
+# Ignore all files matching *.local.* pattern (e.g., settings.local.json)
+*.local.*

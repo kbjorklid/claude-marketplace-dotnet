@@ -1,3 +1,15 @@
+<!--
+Copyright (c) 2018-2025 Stryker Team
+Licensed under the Apache License, Version 2.0
+
+This documentation is from the Stryker.NET project (https://github.com/stryker-mutator/stryker-net)
+and has been included in this project with modifications. The original documentation
+is licensed under the Apache License, Version 2.0.
+
+Modifications have been made to integrate this documentation into the Claude Marketplace project.
+All modifications are licensed under the same Apache License, Version 2.0.
+-->
+
 ---
 title: Introduction
 sidebar_position: 10

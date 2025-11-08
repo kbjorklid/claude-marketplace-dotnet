@@ -4,7 +4,17 @@ description: Analyze Stryker.NET mutation testing reports to identify code cover
 allowed-tools: [Read, Grep, Glob]
 ---
 
+<!--
+License Notice: This skill is licensed under the MIT License, but contains documentation from the Stryker.NET project that is licensed under Apache License 2.0. See:
+- LICENSE - MIT License for this skill
+- LICENSE-APACHE - Apache License 2.0 for Stryker.NET documentation
+- NOTICE - Attribution notices for Stryker.NET content
+-->
+
+
 # Stryker.NET Coverage Analysis
+
+**License:** This skill is licensed under the MIT License. The included Stryker.NET documentation is licensed under Apache License 2.0. See the license files for details.
 
 This skill helps you analyze Stryker.NET mutation testing reports to identify gaps in test coverage and areas where additional tests are needed. Use this skill when you have mutation test results and want to improve your test suite's effectiveness.
 
