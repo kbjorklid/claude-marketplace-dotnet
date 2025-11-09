@@ -14,49 +14,249 @@ License Notice: This skill is licensed under the MIT License, but contains docum
 
 # Stryker.NET Coverage Analysis
 
-**License:** This skill is licensed under the MIT License. The included Stryker.NET documentation is licensed under Apache License 2.0. See the license files for details.
-
-This skill helps you analyze Stryker.NET mutation testing reports to identify gaps in test coverage and areas where additional tests are needed. Use this skill when you have mutation test results and want to improve your test suite's effectiveness.
-
 ## Primary Use Case
 
 The primary use case is to run the Stryker.net mutation testing tool, and then analyze the results for gaps in test coverage.
 
-## Runnig Stryker.NET to Generate Mutation Report
+## Cookbook
+
+Practical recipes for analyzing Stryker.NET mutation testing results and improving test quality.
+
+### Install Dotnet Stryker
+
 ```bash
-# Install Stryker.NET if not already installed
 dotnet tool install -g dotnet-stryker
-
-# Recommended: Run with multiple reporters for comprehensive analysis
-dotnet stryker --reporter "json" --reporter "progress"
 ```
 
-## Locate the Generated Report
+### Generate a JSON Report
+
 ```bash
-# Find the most recent mutation reportp
-find . -name "mutation-report.json" -type f | head -5
-
-# Typical location: StrykerOutput/{timestamp}/reports/mutation-report.json
+dotnet stryker --reporter json
 ```
 
-## Analyze the report
+### Running Stryker for Specific Projects
 
-Use the comprehensive **[JSON Reporter Guide](JSON_REPORTER_GUIDE.md)** for detailed schema information and interpretation guidelines.
+**When test project references multiple projects:**
+```bash
+# Specify which project to test using the project file NAME (not path)
+dotnet stryker --project "MyAwesomeProject.csproj" --reporter json
+```
 
-### Report Generation Configuration example
+**For .NET Framework projects (solution required):**
+```bash
+# Provide the full path to your solution file
+dotnet stryker --solution "../MySolution.sln" --reporter json
+
+# With specific project
+dotnet stryker --solution "../MySolution.sln" --project "MyProject.csproj"  --reporter json
+```
+
+**For multiple test projects covering one project:**
+```bash
+# Run from the PROJECT UNDER TEST directory (not the test directory)
+cd MyProject
+dotnet stryker --test-project "../MyProject.Tests/MyProject.Tests.csproj" --test-project "../MyProject.IntegrationTests/MyProject.IntegrationTests.csproj"  --reporter json
+```
+
+**Default location:** `StrykerOutput/{timestamp}/reports/mutation-report.json`
+
+### Find the report
+
+Find the **latest** report
+
+```bash
+# Cross platform (Git Bash - try this first)
+find . -name "mutation-report.json" -type f -print0 | xargs -0 ls -t | head -1
+
+# Unix/Linux/macOS
+find . -name "mutation-report.json" -type f -exec stat -f '%m %N' {} + | sort -nr | head -1 | cut -d' ' -f2-
+
+# Windows PowerShell
+Get-ChildItem -Path . -Filter "mutation-report.json" -Recurse | Sort-Object -Property LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+```
+
+### Verify jq is installed / install it
+
+Reports are very large. It is important that jq is installed before attempting to read the reports.
+
+```bash
+# Check if jq is available
+which jq || echo "jq not found - install it first!"
+
+# Windows PowerShell
+Get-Command jq -ErrorAction SilentlyContinue
+```
+
+#### Installing jq
+
+```bash
+# Windows (chocolatey)
+choco install jq
+
+# Windows (scoop)
+scoop install jq
+
+# Linux (Debian/Ubuntu)
+apt-get install jq
+
+# macOS
+brew install jq
+```
+
+### Get Actionable Problems (Top 50 Each)
+
+**Note**: This will read the results of the latest stryker run. To get up-to-date results, be sure to run stryker after any code or test modifications. See "Generate a JSON Report" section.
+
+This should be your go-to recipe for getting a list of test coverage failures in order to improve or report on them.
+
+Replace `/path/to/mutation-report.json` with the real path (see "Find the report" section)
+
+```bash
+# List top issues limit to 50 per category for token efficiency
+jq '{
+  no_coverage: [
+    .files | to_entries[] |
+    .key as $file |
+    .value.mutants[] |
+    select(.status == "NoCoverage") |
+    {
+      file: ($file | gsub("\\\\"; "/") | split("/") | .[-1]),
+      line: .location.start.line,
+      mutator: .mutatorName,
+      code: .replacement
+    }
+  ] | sort_by(.file, .line) | .[0:50],
+
+  survived_mutation: [
+    .files | to_entries[] |
+    .key as $file |
+    .value.mutants[] |
+    select(.status == "Survived") |
+    {
+      file: ($file | gsub("\\\\"; "/") | split("/") | .[-1]),
+      line: .location.start.line,
+      mutator: .mutatorName,
+      code: .replacement,
+      testedBy: (.coveredBy | length)
+    }
+  ] | sort_by(.file, .line) | .[0:50]
+}' /path/to/mutation-report.json
+```
+
+
+**How to interpret:**
+- **no_coverage**: Lines with zero test coverage - add tests here
+- **survived_mutation**: Lines with tests, but assertions are weak - strengthen tests
+- **testedBy**: Number of tests covering this code (but not catching the mutation)
+
+
+## Get a Quick Health Check
+
+**Note**: This will read the results of the latest stryker run. To get up-to-date results, be sure to run stryker after any code or test modifications. See "Generate a JSON Report" section.
+
+**Use this when:** You want full statistics including what's working.
+
+```bash
+# Count mutants by status
+jq '[.files[].mutants[].status] | group_by(.) | map({status: .[0], count: length})' mutation-report.json
+```
+
+**Example output:**
+```json
+[
+  {"status": "Killed", "count": 165},
+  {"status": "Survived", "count": 77},
+  {"status": "NoCoverage", "count": 123},
+  {"status": "CompileError", "count": 17},
+  {"status": "Ignored", "count": 101}
+]
+```
+
+**How to interpret:**
+- **165 Killed**: Good! Tests caught 165 mutations
+- **77 Survived**: Warning - 77 mutations slipped through existing tests
+- **123 NoCoverage**: Warning - 123 code paths have no test coverage
+- **17 CompileError**: Ignore - invalid mutations by Stryker
+- **101 Ignored**: Already covered by other tests (optimization)
+
+### Find Files Needing Most Work
+
+**Use this when:** You want to prioritize which files to improve.
+
+```bash
+# Rank files by number of problems
+jq '[.files | to_entries[] | {
+  file: .key,
+  total: (.value.mutants | length),
+  killed: ([.value.mutants[] | select(.status == "Killed")] | length),
+  problems: ([.value.mutants[] | select(.status == "NoCoverage" or .status == "Survived" or .status == "Timeout")] | length)
+} | .score = (if .total > 0 then ((.killed / .total) * 100 | floor) else 0 end)] | sort_by(.score)' mutation-report.json
+```
+
+**Example output:**
+```json
+[
+  {"file": "/code/test-project/src/StrykerTestProject/PaymentProcessor.cs", "total": 138, "killed": 29, "problems": 85, "score": 21},
+  {"file": "/code/test-project/src/StrykerTestProject/StringHelper.cs", "total": 94, "killed": 25, "problems": 46, "score": 26},
+  {"file": "/code/test-project/src/StrykerTestProject/MathHelper.cs", "total": 130, "killed": 44, "problems": 51, "score": 33}
+]
+```
+
+**How to interpret:**
+- **PaymentProcessor.cs**: 21% score - 85 mutants need attention
+- **StringHelper.cs**: 26% score - 46 mutants need attention
+- **MathHelper.cs**: 33% score - 51 mutants need attention
+
+### Investigate Specific File
+
+**Use this when:** You want detailed issues for one file.
+
+Replace `/path/to/mutation-report.json` with the real path (see "Find the report" section)
+
+Replace `/path/to/cs/file/Example.cs` with real path to the 
+
+```bash
+# Get all issues for a specific file (adjust path to match your report)
+jq --arg file "/path/to/cs/file/Example.cs" '
+  .files[$file].mutants[] |
+  select(.status == "NoCoverage" or .status == "Survived" or .status == "Timeout") |
+  {
+    line: .location.start.line,
+    status: .status,
+    mutation: .replacement,
+    mutator: .mutatorName,
+    recommendation: (
+      if .status == "NoCoverage" then "Add test coverage"
+      elif .status == "Survived" then "Strengthen existing tests"
+      elif .status == "Timeout" then "Check for infinite loops"
+      else "Review mutation"
+      end
+    )
+  }
+' /path/to/mutation-report.json
+```
+
+**Example output:**
 ```json
 {
-  "stryker-config": {
-    "reporters": ["json", "progress", "html"],
-    "report-file-name": "my-mutation-report.json",
-    "output": "./MutationReports",
-    "thresholds": {
-      "high": 80,
-      "low": 60,
-      "break": 0
-    }
-  }
+  "line": 24,
+  "status": "Survived",
+  "mutation": "isPremiumCustomer || orderAmount >= PremiumCustomerThreshold",
+  "mutator": "Logical mutation",
+  "recommendation": "Strengthen existing tests"
 }
+{
+  "line": 56,
+  "status": "NoCoverage",
+  "mutation": "true",
+  "mutator": "Boolean mutation",
+  "recommendation": "Add test coverage"
+}
+```
+
+**How to interpret:**
+- Line 24: Test exists but needs stronger assertions
+- Line 56: No test coverage at all - write a new test
 
 ## Official Documentation Table of Contents
 
